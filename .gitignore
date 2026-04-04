@@ -1,0 +1,14 @@
+# Ambiente Virtual
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+
+# Banco de dados local (se usar SQLite para teste)
+*.sqlite3

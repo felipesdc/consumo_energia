@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Monitor de Energia - Univesp</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        display: flex;
+        justify-content: center;
+        background: #f4f4f9;
+      }
+      .card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 300px;
+      }
+      .dado {
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 0.5rem;
+      }
+      .valor {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+      .label {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Consumo em Tempo Real</h2>
+
+      <div class="dado">
+        <div class="label">Corrente</div>
+        <div id="corrente" class="valor">0.000</div>
+        <small>A</small>
+      </div>
+
+      <div class="dado">
+        <div class="label">Potência</div>
+        <div id="potencia" class="valor">0.0</div>
+        <small>W</small>
+      </div>
+
+      <div class="dado">
+        <div class="label">Consumo Total</div>
+        <div id="total" class="valor">0.000000</div>
+        <small>kWh</small>
+      </div>
+    </div>
+
+    <script>
+      // Função que busca os dados no servidor a cada 1 segundo
+      function atualizarDados() {
+        fetch("/dados")
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("corrente").innerText =
+              data.corrente.toFixed(3);
+            document.getElementById("potencia").innerText =
+              data.potencia.toFixed(1);
+            document.getElementById("total").innerText =
+              data.total_kwh.toFixed(6);
+          });
+      }
+      setInterval(atualizarDados, 1000);
+    </script>
+  </body>
+</html>
