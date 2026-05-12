@@ -2,76 +2,125 @@
 <html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
-    <title>Monitor de Energia - Univesp</title>
+    <title>Dashboard de Energia</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       body {
-        font-family: sans-serif;
-        display: flex;
-        justify-content: center;
-        background: #f4f4f9;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #f0f2f5;
+        margin: 20px;
+      }
+      .container {
+        max-width: 900px;
+        margin: auto;
+      }
+      .status-banner {
+        padding: 10px;
+        border-radius: 5px;
+        text-align: center;
+        margin-bottom: 20px;
+        font-weight: bold;
+      }
+      .online {
+        background: #d4edda;
+        color: #155724;
+      }
+      .offline {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 30px;
       }
       .card {
         background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        width: 300px;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        text-align: center;
       }
-      .dado {
-        margin-bottom: 1.5rem;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 0.5rem;
-      }
-      .valor {
-        font-size: 1.5rem;
+      .value {
+        font-size: 24px;
         font-weight: bold;
-        color: #2c3e50;
+        color: #007bff;
       }
-      .label {
-        color: #7f8c8d;
-        font-size: 0.9rem;
-        text-transform: uppercase;
+      .chart-container {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
       }
     </style>
   </head>
   <body>
-    <div class="card">
-      <h2>Consumo em Tempo Real</h2>
+    <div class="container">
+      <div id="status" class="status-banner offline">Arduino desconectado</div>
 
-      <div class="dado">
-        <div class="label">Corrente</div>
-        <div id="corrente" class="valor">0.000</div>
-        <small>A</small>
+      <div class="cards">
+        <div class="card">
+          <div>Corrente (A)</div>
+          <div id="corrente" class="value">0.000</div>
+        </div>
+        <div class="card">
+          <div>Potência (W)</div>
+          <div id="potencia" class="value">0.0</div>
+        </div>
+        <div class="card">
+          <div>Total (kWh)</div>
+          <div id="total" class="value">0.000</div>
+        </div>
       </div>
 
-      <div class="dado">
-        <div class="label">Potência</div>
-        <div id="potencia" class="valor">0.0</div>
-        <small>W</small>
-      </div>
-
-      <div class="dado">
-        <div class="label">Consumo Total</div>
-        <div id="total" class="valor">0.000000</div>
-        <small>kWh</small>
+      <div class="chart-container">
+        <canvas id="energyChart"></canvas>
       </div>
     </div>
 
     <script>
-      // Função que busca os dados no servidor a cada 1 segundo
-      function atualizarDados() {
+      const ctx = document.getElementById("energyChart").getContext("2d");
+      const energyChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
+          datasets: [
+            {
+              label: "Consumo Acumulado (kWh)",
+              data: [0, 0, 0, 0, 0, 0, 0],
+              backgroundColor: "rgba(0, 123, 255, 0.6)",
+            },
+          ],
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } },
+      });
+
+      function atualizar() {
         fetch("/dados")
-          .then((response) => response.json())
+          .then((res) => res.json())
           .then((data) => {
-            document.getElementById("corrente").innerText =
-              data.corrente.toFixed(3);
-            document.getElementById("potencia").innerText =
-              data.potencia.toFixed(1);
-            document.getElementById("total").innerText =
-              data.total_kwh.toFixed(6);
+            const statusDiv = document.getElementById("status");
+            statusDiv.innerText = data.status;
+            statusDiv.className =
+              "status-banner " +
+              (data.status === "Conectado" ? "online" : "offline");
+
+            if (data.status === "Conectado") {
+              document.getElementById("corrente").innerText =
+                data.real_time.corrente.toFixed(3);
+              document.getElementById("potencia").innerText =
+                data.real_time.potencia.toFixed(1);
+              document.getElementById("total").innerText =
+                data.real_time.total.toFixed(3);
+
+              energyChart.data.datasets[0].data = data.graph_data;
+              energyChart.update();
+            }
           });
       }
-      setInterval(atualizarDados, 1000);
+
+      setInterval(atualizar, 1000);
     </script>
   </body>
 </html>

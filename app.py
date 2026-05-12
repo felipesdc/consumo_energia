@@ -5,43 +5,65 @@ import time
 
 app = Flask(__name__)
 
-# Variáveis globais para armazenar os dados lidos
-dados_atuais = {
-    "corrente": 0.0,
-    "potencia": 0.0,
-    "total_kwh": 0.0
+# Memória compartilhada
+estado_sistema = {
+    "conectado": False,
+    "dados_atuais": {"corrente": 0.0, "potencia": 0.0, "total": 0.0},
+    "historico": [0.0] * 168
 }
 
-def leitura_arduino():
-    global dados_atuais
-    # AJUSTE A PORTA SERIAL AQUI
-    try:
-        ser = serial.Serial('COM3', 9600, timeout=1)
-        while True:
-            if ser.in_waiting > 0:
-                linha = ser.readline().decode('utf-8').strip()
-                if "Corrente_A:" in linha:
-                    corrente = float(linha.split(":")[1])
-                    potencia = corrente * 127.0 # Assumindo 127V
-                    # Simulação simples de acúmulo para o exemplo
-                    dados_atuais["corrente"] = corrente
-                    dados_atuais["potencia"] = potencia
-                    dados_atuais["total_kwh"] += (potencia / 3600000) # Incremento por segundo
-            time.sleep(0.1)
-    except:
-        print("Erro na Serial. Verifique a conexão.")
+def monitor_serial():
+    global estado_sistema
+    porta = 'COM3' # Ajuste conforme seu sistema
+    
+    while True:
+        try:
+            with serial.Serial(porta, 9600, timeout=1) as ser:
+                estado_sistema["conectado"] = True
+                print(f"Conectado em {porta}")
+                
+                while True:
+                    if ser.in_waiting > 0:
+                        linha = ser.readline().decode('utf-8', errors='ignore').strip()
+                        partes = linha.split('|')
+                        
+                        if partes[0] == "REAL_TIME" and len(partes) == 4:
+                            estado_sistema["dados_atuais"] = {
+                                "corrente": float(partes[1]),
+                                "potencia": float(partes[2]),
+                                "total": float(partes[3])
+                            }
+                        
+                        elif partes[0] == "HIST" and len(partes) == 3:
+                            idx = int(partes[1])
+                            valor = float(partes[2])
+                            if idx < 168:
+                                estado_sistema["historico"][idx] = valor
 
-# Rota principal que carrega a página
+                    time.sleep(0.1)
+        except (serial.SerialException, FileNotFoundError):
+            estado_sistema["conectado"] = False
+            print("Arduino desconectado. Tentando reconectar...")
+            time.sleep(2)
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Rota que o JavaScript vai consultar para pegar os números novos
 @app.route('/dados')
-def dados():
-    return jsonify(dados_atuais)
+def get_dados():
+    # Processa histórico para dados diários (soma simples para o gráfico)
+    # Pega o último registro de cada bloco de 24h para representar o acumulado do dia
+    historico_diario = []
+    for i in range(23, 168, 24):
+        historico_diario.append(round(estado_sistema["historico"][i], 2))
+        
+    return jsonify({
+        "status": "Conectado" if estado_sistema["conectado"] else "Arduino desconectado",
+        "real_time": estado_sistema["dados_atuais"],
+        "graph_data": historico_diario
+    })
 
 if __name__ == '__main__':
-    # Inicia a leitura do Arduino em segundo plano
-    threading.Thread(target=leitura_arduino, daemon=True).start()
-    app.run(debug=True, port=5000, use_reloader=False)
+    threading.Thread(target=monitor_serial, daemon=True).start()
+    app.run(debug=False, port=5000)
